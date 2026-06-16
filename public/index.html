@@ -111,8 +111,12 @@
     <section class="card" id="historyCard">
       <div class="card-head">
         <h2>Recent predictions</h2>
-        <button class="btn btn-ghost" id="clearHistoryBtn" type="button">Clear history</button>
+        <div class="head-actions">
+          <button class="btn btn-primary" id="checkResultsBtn" type="button" title="Fetch final scores and grade predictions">✓ Check results</button>
+          <button class="btn btn-ghost" id="clearHistoryBtn" type="button">Clear history</button>
+        </div>
       </div>
+      <div id="scoreboard" class="scoreboard hidden"></div>
       <div id="historyList" class="history-list"><div class="empty">No predictions saved yet.</div></div>
     </section>
   </main>

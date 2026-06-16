@@ -254,6 +254,25 @@ const HTFT_CODES = [
   'Away/Home', 'Away/Draw', 'Away/Away',
 ];
 
+/** Parse a "H-A" scoreline into [home, away] integers, or null. */
+function parseScore(s) {
+  if (!s || typeof s !== 'string') return null;
+  const m = s.match(/(\d+)\s*[-:–]\s*(\d+)/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2])];
+}
+
+/** Derive Over/Under 2.5 and BTTS picks from the predicted scoreline. */
+function derivedMarketPicks(predictedScore) {
+  const sc = parseScore(predictedScore);
+  if (!sc) return { overUnder25: 'n/a', btts: 'n/a' };
+  const [h, a] = sc;
+  return {
+    overUnder25: h + a > 2.5 ? 'over' : 'under',
+    btts: h > 0 && a > 0 ? 'yes' : 'no',
+  };
+}
+
 /** Validate/repair the HT/FT object so the pick is always one of the 9 codes. */
 function normalizeHtft(htft, ctx) {
   const valid = (c) => HTFT_CODES.includes(c);
@@ -299,6 +318,9 @@ function finalize(raw, ctx, answers, activeProvider, isHeuristic) {
       riskLevel: safe.prediction?.riskLevel ?? 'medium',
       alternativeScenario: safe.prediction?.alternativeScenario ?? 'No alternative provided.',
       htft: normalizeHtft(safe.prediction?.htft, ctx),
+      // Gradeable market picks derived from the predicted scoreline so they are
+      // always internally consistent and settle-able, for both AI & heuristic.
+      markets: derivedMarketPicks(safe.prediction?.predictedScore),
     },
     bettingStyleInsights: {
       overUnder25: safe.bettingStyleInsights?.overUnder25 ?? 'Not requested',

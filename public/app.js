@@ -4,6 +4,17 @@
 const HISTORY_KEY = 'wc2026.predictions.v1';
 const $ = (id) => document.getElementById(id);
 
+// All times shown in Malaysia time (GMT+8).
+const DISPLAY_TZ = 'Asia/Kuala_Lumpur';
+const fmtDateTime = (iso, opts = {}) =>
+  new Date(iso).toLocaleString('en-GB', {
+    timeZone: DISPLAY_TZ,
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    hour12: false, timeZoneName: 'short', ...opts,
+  });
+// GMT+8 calendar-day key (YYYY-MM-DD) so date filtering matches the displayed day.
+const myDateKey = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { timeZone: DISPLAY_TZ }) : '');
+
 const state = {
   matches: [],
   filtered: [],
@@ -70,7 +81,7 @@ async function loadMatches(refresh = false) {
       ? '<span class="badge badge-mock">MOCK DATA</span>'
       : `<span class="badge badge-complete">${data.source === 'cache' ? 'CACHED' : 'LIVE'}</span>`;
     $('statusUpdated').textContent = data.lastUpdated
-      ? new Date(data.lastUpdated).toLocaleTimeString()
+      ? new Date(data.lastUpdated).toLocaleTimeString('en-GB', { timeZone: DISPLAY_TZ, hour12: false }) + ' MYT'
       : '—';
 
     buildFilterOptions();
@@ -82,13 +93,13 @@ async function loadMatches(refresh = false) {
 
 function buildFilterOptions() {
   const groups = [...new Set(state.matches.map((m) => m.group).filter(Boolean))].sort();
-  const dates = [...new Set(state.matches.map((m) => (m.kickoffUtc || '').slice(0, 10)).filter(Boolean))].sort();
+  const dates = [...new Set(state.matches.map((m) => myDateKey(m.kickoffUtc)).filter(Boolean))].sort();
   $('groupFilter').innerHTML =
     '<option value="">All groups</option>' + groups.map((g) => `<option>${g}</option>`).join('');
   $('dateFilter').innerHTML =
     '<option value="">All dates</option>' +
     dates
-      .map((d) => `<option value="${d}">${new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</option>`)
+      .map((d) => `<option value="${d}">${new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}</option>`)
       .join('');
 }
 
@@ -101,7 +112,7 @@ function applyFilters() {
   state.filtered = state.matches.filter((m) => {
     if (q && !`${m.homeTeam} ${m.awayTeam} ${m.homeCode} ${m.awayCode}`.toLowerCase().includes(q)) return false;
     if (g && m.group !== g) return false;
-    if (d && (m.kickoffUtc || '').slice(0, 10) !== d) return false;
+    if (d && myDateKey(m.kickoffUtc) !== d) return false;
     if (st && m.status !== st) return false;
     return true;
   });
@@ -144,9 +155,7 @@ function renderMatchList() {
 
 function kickoffShort(iso) {
   if (!iso) return 'TBD';
-  return new Date(iso).toLocaleString(undefined, {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+  return fmtDateTime(iso); // Malaysia time (GMT+8)
 }
 
 /* ------------------------------------------------------------------ */
@@ -171,7 +180,7 @@ async function selectMatch(id) {
       <div class="team-block"><div class="team-name">${match.awayTeam}</div><div class="team-code">${match.awayCode || 'away'}</div></div>
     </div>
     <div class="selected-meta">
-      <span><b>Kickoff:</b> ${match.kickoffLocal || kickoffShort(match.kickoffUtc)}</span>
+      <span><b>Kickoff:</b> ${kickoffShort(match.kickoffUtc)}</span>
       <span><b>Group:</b> ${match.group || '—'}</span>
       <span><b>Venue:</b> ${match.venue || 'TBD'}${match.city ? ', ' + match.city : ''}</span>
       <span><b>Status:</b> ${match.status}</span>
@@ -276,11 +285,12 @@ async function generate() {
         requestPrediction({ ...answers, predictionStyle: 'high-risk' }),
       ]);
       renderCompare(safe, upset);
-      saveHistory(safe.prediction, 'safe vs upset');
+      saveHistory(safe.prediction, 'safe', state.selected.id);
+      saveHistory(upset.prediction, 'high-risk', state.selected.id);
     } else {
       const data = await requestPrediction(answers);
       renderPrediction(data);
-      saveHistory(data.prediction, answers.predictionStyle || 'balanced');
+      saveHistory(data.prediction, answers.predictionStyle || 'balanced', state.selected.id);
     }
     $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (e) {
@@ -423,37 +433,226 @@ function getHistory() {
   }
 }
 
-function saveHistory(prediction, style) {
+function saveHistory(prediction, style, matchId) {
   const hist = getHistory();
+  const p = prediction.prediction;
   hist.unshift({
+    id: 'p' + Date.now() + Math.random().toString(36).slice(2, 7),
     when: new Date().toISOString(),
+    matchId: matchId || null,
+    homeTeam: prediction.match.homeTeam,
+    awayTeam: prediction.match.awayTeam,
     match: `${prediction.match.homeTeam} vs ${prediction.match.awayTeam}`,
-    winner: prediction.prediction.winner,
-    score: prediction.prediction.predictedScore,
-    confidence: Math.round(prediction.prediction.confidence),
     style,
+    confidence: Math.round(p.confidence),
+    predicted: {
+      winner: p.winner,
+      resultType: p.resultType,
+      score: p.predictedScore,
+      htResult: p.halfTime?.result || null,
+      htft: p.htft?.pick || null,
+      ou25: p.markets?.overUnder25 || 'n/a',
+      btts: p.markets?.btts || 'n/a',
+    },
+    settled: false,
+    manual: false,
+    actual: null, // { ft:{home,away}, ht:{home,away}|null }
+    grades: null, // { outcome, score, halfTime, htft, ou25, btts } each true/false/null
   });
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist.slice(0, 25)));
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist.slice(0, 30)));
   renderHistory();
+}
+
+/** Parse "2-1" into [2,1] (handles -, :, – separators). */
+function parseScoreStr(s) {
+  if (!s) return null;
+  const m = String(s).match(/(\d+)\s*[-:–]\s*(\d+)/);
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
+
+const outcomeOf = (h, a) => (h > a ? 'home_win' : h < a ? 'away_win' : 'draw');
+const sideCode = (o) => (o === 'home_win' || o === 'home_lead' ? 'Home' : o === 'away_win' || o === 'away_lead' ? 'Away' : 'Draw');
+
+/** Grade every market for a record against an actual result. true/false/null. */
+function gradePrediction(rec, actual) {
+  const { ft, ht } = actual;
+  const pr = rec.predicted;
+  const g = { outcome: null, score: null, halfTime: null, htft: null, ou25: null, btts: null };
+
+  const aOutcome = outcomeOf(ft.home, ft.away);
+  g.outcome = pr.resultType ? pr.resultType === aOutcome : null;
+
+  const ps = parseScoreStr(pr.score);
+  g.score = ps ? ps[0] === ft.home && ps[1] === ft.away : null;
+
+  const total = ft.home + ft.away;
+  g.ou25 = pr.ou25 === 'n/a' ? null : pr.ou25 === (total > 2.5 ? 'over' : 'under');
+  g.btts = pr.btts === 'n/a' ? null : pr.btts === (ft.home > 0 && ft.away > 0 ? 'yes' : 'no');
+
+  if (ht) {
+    const aHt = ht.home > ht.away ? 'home_lead' : ht.home < ht.away ? 'away_lead' : 'draw';
+    g.halfTime = pr.htResult ? pr.htResult === aHt : null;
+    const actualHtft = `${sideCode(aHt)}/${sideCode(aOutcome)}`;
+    g.htft = pr.htft ? pr.htft === actualHtft : null;
+  }
+  return g;
+}
+
+/** Auto-settle: fetch results for all unsettled predictions with a matchId. */
+async function settleAll() {
+  const btn = $('checkResultsBtn');
+  const hist = getHistory();
+  const pending = hist.filter((h) => !h.settled && h.matchId);
+  if (!pending.length) {
+    flash(btn, 'Nothing to settle');
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Checking…';
+  let settledCount = 0;
+  let notFinished = 0;
+  for (const rec of pending) {
+    try {
+      const r = await api(`/api/matches/${rec.matchId}/result`);
+      if (r.found && r.finished && r.ft) {
+        rec.actual = { ft: r.ft, ht: r.ht || null };
+        rec.grades = gradePrediction(rec, rec.actual);
+        rec.settled = true;
+        settledCount++;
+      } else {
+        notFinished++;
+      }
+    } catch {
+      notFinished++;
+    }
+  }
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+  renderHistory();
+  btn.disabled = false;
+  btn.textContent = '✓ Check results';
+  flash(btn, `Settled ${settledCount}${notFinished ? ` · ${notFinished} not finished yet` : ''}`);
+}
+
+/** Manual settle from typed FT (and optional HT) score. */
+function settleManual(id, ftStr, htStr) {
+  const hist = getHistory();
+  const rec = hist.find((h) => h.id === id);
+  if (!rec) return;
+  const ft = parseScoreStr(ftStr);
+  if (!ft) {
+    alert('Enter the full-time score like 2-1');
+    return;
+  }
+  const ht = parseScoreStr(htStr);
+  rec.actual = { ft: { home: ft[0], away: ft[1] }, ht: ht ? { home: ht[0], away: ht[1] } : null };
+  rec.grades = gradePrediction(rec, rec.actual);
+  rec.settled = true;
+  rec.manual = true;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+  renderHistory();
+}
+
+function flash(btn, msg) {
+  const prev = btn.textContent;
+  btn.textContent = msg;
+  setTimeout(() => (btn.textContent = prev), 2200);
+}
+
+function gBadge(label, val) {
+  const cls = val === true ? 'mk-ok' : val === false ? 'mk-no' : 'mk-na';
+  const mark = val === true ? '✓' : val === false ? '✗' : '–';
+  return `<span class="mk ${cls}">${label} ${mark}</span>`;
 }
 
 function renderHistory() {
   const hist = getHistory();
   const list = $('historyList');
+  renderScoreboard(hist);
+
   if (!hist.length) {
     list.innerHTML = '<div class="empty">No predictions saved yet.</div>';
     return;
   }
+
   list.innerHTML = hist
-    .map(
-      (h) => `<div class="history-row">
-        <div>
-          <div><b>${h.match}</b> — ${h.winner} (${h.score})</div>
-          <div class="h-meta">${new Date(h.when).toLocaleString()} · ${h.style} · ${h.confidence}% conf.</div>
+    .map((h) => {
+      const headline = !h.settled
+        ? '<span class="badge badge-pending">PENDING</span>'
+        : h.grades?.outcome
+        ? '<span class="badge badge-correct">CORRECT</span>'
+        : '<span class="badge badge-wrong">WRONG</span>';
+      const actualLine = h.settled
+        ? ` · actual ${h.actual.ft.home}–${h.actual.ft.away}${h.actual.ht ? ` (HT ${h.actual.ht.home}–${h.actual.ht.away})` : ''}${h.manual ? ' · manual' : ''}`
+        : '';
+      const grid = h.settled
+        ? `<div class="mk-row">
+             ${gBadge('Outcome', h.grades.outcome)}
+             ${gBadge('Score', h.grades.score)}
+             ${gBadge('HT', h.grades.halfTime)}
+             ${gBadge('HT/FT', h.grades.htft)}
+             ${gBadge('O/U 2.5', h.grades.ou25)}
+             ${gBadge('BTTS', h.grades.btts)}
+           </div>`
+        : `<div class="manual-entry">
+             <input class="me-ft" data-id="${h.id}" placeholder="FT e.g. 2-1" />
+             <input class="me-ht" data-id="${h.id}" placeholder="HT 1-0 (optional)" />
+             <button class="btn btn-ghost me-go" data-id="${h.id}" type="button">Grade</button>
+           </div>`;
+      return `<div class="history-row">
+        <div class="hr-main">
+          <div class="hr-title"><b>${h.match}</b> — ${h.predicted.winner} (${h.predicted.score}) ${headline}</div>
+          <div class="h-meta">${fmtDateTime(h.when, { year: 'numeric' })} · ${h.style} · ${h.confidence}% conf.${actualLine}</div>
+          ${grid}
         </div>
-      </div>`
-    )
+      </div>`;
+    })
     .join('');
+
+  // wire manual-entry buttons
+  list.querySelectorAll('.me-go').forEach((b) =>
+    b.addEventListener('click', () => {
+      const id = b.dataset.id;
+      const ft = list.querySelector(`.me-ft[data-id="${id}"]`).value;
+      const ht = list.querySelector(`.me-ht[data-id="${id}"]`).value;
+      settleManual(id, ft, ht);
+    })
+  );
+}
+
+function renderScoreboard(hist) {
+  const board = $('scoreboard');
+  const settled = hist.filter((h) => h.settled && h.grades);
+  if (!settled.length) {
+    board.classList.add('hidden');
+    return;
+  }
+  board.classList.remove('hidden');
+  const correct = settled.filter((h) => h.grades.outcome === true).length;
+  const acc = Math.round((correct / settled.length) * 100);
+  // per-market hit rates
+  const markets = [
+    ['Outcome', 'outcome'],
+    ['Score', 'score'],
+    ['HT', 'halfTime'],
+    ['HT/FT', 'htft'],
+    ['O/U 2.5', 'ou25'],
+    ['BTTS', 'btts'],
+  ];
+  const chips = markets
+    .map(([label, key]) => {
+      const graded = settled.filter((h) => h.grades[key] !== null && h.grades[key] !== undefined);
+      if (!graded.length) return '';
+      const hit = graded.filter((h) => h.grades[key] === true).length;
+      return `<span class="sb-chip">${label}: <b>${hit}/${graded.length}</b></span>`;
+    })
+    .join('');
+  board.innerHTML = `
+    <div class="sb-headline">
+      <span class="sb-big">${correct}/${settled.length}</span>
+      <span class="sb-label">outcomes correct</span>
+      <span class="sb-acc">${acc}%</span>
+    </div>
+    <div class="sb-chips">${chips}</div>`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -469,9 +668,11 @@ function init() {
   $('rerunBtn').addEventListener('click', generate);
   $('planToggle').addEventListener('click', () => $('decisionPlan').classList.toggle('hidden'));
   $('clearHistoryBtn').addEventListener('click', () => {
+    if (!confirm('Clear all saved predictions and their results?')) return;
     localStorage.removeItem(HISTORY_KEY);
     renderHistory();
   });
+  $('checkResultsBtn').addEventListener('click', settleAll);
 
   loadStatus();
   loadMatches();

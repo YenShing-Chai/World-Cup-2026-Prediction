@@ -11,13 +11,16 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
+// All user-facing times are shown in Malaysia time (GMT+8) per project spec.
+export const DISPLAY_TZ = 'Asia/Kuala_Lumpur';
+
 /**
- * Format a UTC ISO timestamp into a readable local string.
+ * Format a UTC ISO timestamp into a readable string in Malaysia time (GMT+8).
  * @param {string} iso
- * @param {string} [timeZone] - IANA tz; defaults to the server's local zone.
+ * @param {string} [timeZone] - IANA tz; defaults to Asia/Kuala_Lumpur.
  * @returns {string}
  */
-export function toLocal(iso, timeZone) {
+export function toLocal(iso, timeZone = DISPLAY_TZ) {
   if (!iso) return '';
   try {
     return new Date(iso).toLocaleString('en-US', {

@@ -176,10 +176,43 @@ input:focus, select:focus { outline: 2px solid var(--brand-2); border-color: var
 .compare-col h4 { margin: 0 0 8px; }
 
 /* History */
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .history-list { display: flex; flex-direction: column; gap: 8px; }
 .history-row { display: flex; justify-content: space-between; gap: 10px; padding: 10px 13px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); font-size: 0.86rem; }
-.history-row .h-meta { color: var(--muted); font-size: 0.76rem; }
+.history-row .h-meta { color: var(--muted); font-size: 0.76rem; margin-top: 2px; }
+.hr-main { width: 100%; }
+.hr-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.badge-correct { background: rgba(24,180,107,.16); color: var(--brand); border: 1px solid rgba(24,180,107,.5); }
+.badge-correct::before { content: "✓ "; }
+.badge-wrong { background: rgba(239,93,107,.14); color: var(--danger); border: 1px solid rgba(239,93,107,.45); }
+.badge-wrong::before { content: "✗ "; }
+.badge-pending { background: rgba(147,163,189,.12); color: var(--muted); border: 1px solid var(--line); }
+
+/* Per-market grade chips */
+.mk-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mk { font-size: 0.72rem; padding: 3px 8px; border-radius: 7px; border: 1px solid var(--line); font-weight: 600; }
+.mk-ok { background: rgba(24,180,107,.14); color: var(--brand); border-color: rgba(24,180,107,.4); }
+.mk-no { background: rgba(239,93,107,.12); color: var(--danger); border-color: rgba(239,93,107,.4); }
+.mk-na { background: transparent; color: var(--muted); }
+
+/* Manual result entry */
+.manual-entry { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.manual-entry input { width: 120px; padding: 6px 9px; font-size: 0.8rem; }
+.manual-entry .btn { padding: 6px 12px; font-size: 0.8rem; }
+
+/* Scoreboard */
+.scoreboard { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
+  background: linear-gradient(180deg, rgba(24,180,107,.08), rgba(24,180,107,.02)); }
+.sb-headline { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.sb-big { font-size: 1.5rem; font-weight: 800; color: var(--text); }
+.sb-label { color: var(--muted); font-size: 0.85rem; }
+.sb-acc { margin-left: auto; font-size: 1.4rem; font-weight: 800; color: var(--accent); }
+.sb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.sb-chip { font-size: 0.78rem; color: var(--muted); background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 4px 9px; }
+.sb-chip b { color: var(--text); }
 
 /* States */
 .empty { color: var(--muted); text-align: center; padding: 24px; font-size: 0.9rem; }

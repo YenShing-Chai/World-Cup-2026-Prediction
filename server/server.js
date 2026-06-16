@@ -121,6 +121,29 @@ app.get('/api/matches/:id/context', async (req, res) => {
   }
 });
 
+/** Actual final result for a match (used to settle predictions). */
+app.get('/api/matches/:id/result', async (req, res) => {
+  try {
+    const data = await loadFixtures(false);
+    const match = data.matches.find((m) => m.id === req.params.id);
+    if (!match) return res.json({ found: false });
+    const finished = match.status === 'complete' && match.homeScore != null && match.awayScore != null;
+    res.json({
+      found: true,
+      status: match.status,
+      finished,
+      ft: finished ? { home: match.homeScore, away: match.awayScore } : null,
+      ht:
+        match.htHomeScore != null && match.htAwayScore != null
+          ? { home: match.htHomeScore, away: match.htAwayScore }
+          : null,
+      provider: data.activeProvider,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** Step 1 of prediction flow: ask clarifying questions. */
 app.post('/api/prediction/questions', async (req, res) => {
   try {

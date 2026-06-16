@@ -30,7 +30,9 @@ status · selected-match card · AI clarifying questions · structured predictio
 alternative scenario, data sources, missing data, disclaimer) · betting-style
 markets incl. Over/Under 2.5, BTTS, Handicap and a dedicated **HT/FT double
 result** · localStorage history · **re-run** button · **compare two styles**
-(Safe vs Upset).
+(Safe vs Upset) · **auto-grading** of saved predictions (Correct/Wrong per market
++ accuracy scoreboard) once the real result is in · all times shown in **Malaysia
+time (GMT+8)**.
 
 ---
 

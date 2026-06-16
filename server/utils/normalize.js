@@ -53,6 +53,10 @@ export function buildMatch(partial) {
     status: normalizeStatus(partial.status),
     homeScore: partial.homeScore ?? null,
     awayScore: partial.awayScore ?? null,
+    // Half-time scores (used to grade HT and HT/FT markets). Null when the
+    // provider does not expose them.
+    htHomeScore: partial.htHomeScore ?? null,
+    htAwayScore: partial.htAwayScore ?? null,
   };
 }
 

@@ -60,6 +60,8 @@ export async function getUpcomingMatches({ apiKey, baseUrl }) {
       status: m.status,
       homeScore: m.score?.fullTime?.home,
       awayScore: m.score?.fullTime?.away,
+      htHomeScore: m.score?.halfTime?.home ?? null,
+      htAwayScore: m.score?.halfTime?.away ?? null,
     })
   );
 
