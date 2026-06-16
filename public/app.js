@@ -2,7 +2,19 @@
  * Talks only to the local backend proxy (no API keys in the browser). */
 
 const HISTORY_KEY = 'wc2026.predictions.v1';
+const LAST_KEY = 'wc2026.lastResult.v1';
 const $ = (id) => document.getElementById(id);
+
+/* Persist the most recent prediction so it survives a browser refresh. */
+function saveLastResult(payload) {
+  try { localStorage.setItem(LAST_KEY, JSON.stringify(payload)); } catch {}
+}
+function getLastResult() {
+  try { return JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch { return null; }
+}
+function clearLastResult() {
+  localStorage.removeItem(LAST_KEY);
+}
 
 // All times shown in Malaysia time (GMT+8).
 const DISPLAY_TZ = 'Asia/Kuala_Lumpur';
@@ -161,16 +173,7 @@ function kickoffShort(iso) {
 /* ------------------------------------------------------------------ */
 /* Selection + context                                                */
 /* ------------------------------------------------------------------ */
-async function selectMatch(id) {
-  const match = state.matches.find((m) => m.id === id);
-  if (!match) return;
-  state.selected = match;
-  renderMatchList();
-
-  // reset downstream panels
-  $('questionCard').classList.add('hidden');
-  $('resultCard').classList.add('hidden');
-
+function renderSelectedCard(match) {
   const card = $('selectedCard');
   card.classList.remove('hidden');
   $('selectedBody').innerHTML = `
@@ -185,7 +188,22 @@ async function selectMatch(id) {
       <span><b>Venue:</b> ${match.venue || 'TBD'}${match.city ? ', ' + match.city : ''}</span>
       <span><b>Status:</b> ${match.status}</span>
     </div>`;
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function selectMatch(id) {
+  const match = state.matches.find((m) => m.id === id);
+  if (!match) return;
+  state.selected = match;
+  state.context = null;
+  clearLastResult(); // picking a new match invalidates the persisted result
+  renderMatchList();
+
+  // reset downstream panels
+  $('questionCard').classList.add('hidden');
+  $('resultCard').classList.add('hidden');
+
+  renderSelectedCard(match);
+  $('selectedCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /* ------------------------------------------------------------------ */
@@ -216,20 +234,24 @@ async function askQuestions() {
   }
 }
 
-function renderQuestions(questions) {
+function renderQuestions(questions, saved) {
+  saved = saved || {};
   $('questionForm').innerHTML = questions
     .map((qn) => {
+      const savedVal = saved[qn.id];
       if (qn.type === 'multiselect') {
+        const chosen = Array.isArray(savedVal) ? savedVal : qn.default || [];
         const chips = qn.options
           .map(
             (o) =>
-              `<span class="chip ${qn.default?.includes(o) ? 'selected' : ''}" data-q="${qn.id}" data-val="${o}">${o}</span>`
+              `<span class="chip ${chosen.includes(o) ? 'selected' : ''}" data-q="${qn.id}" data-val="${o}">${o}</span>`
           )
           .join('');
         return field(qn, `<div class="chip-row" data-multi="${qn.id}">${chips}</div>`);
       }
+      const sel = savedVal != null ? savedVal : qn.default;
       const opts = qn.options
-        .map((o) => `<option value="${o}" ${o === qn.default ? 'selected' : ''}>${o}</option>`)
+        .map((o) => `<option value="${o}" ${o === sel ? 'selected' : ''}>${o}</option>`)
         .join('');
       return field(qn, `<select data-q="${qn.id}">${opts}</select>`);
     })
@@ -268,7 +290,10 @@ function collectAnswers() {
 /* ------------------------------------------------------------------ */
 async function generate() {
   if (!state.selected || !state.context) return;
-  const answers = collectAnswers();
+  // Use the live form if it's rendered, else fall back to the saved answers
+  // (e.g. re-run right after a refresh restored the result).
+  const formHasFields = $('questionForm').querySelector('[data-q],[data-multi]');
+  const answers = formHasFields ? collectAnswers() : state.lastAnswers || {};
   state.lastAnswers = answers;
   const compare = $('compareToggle').checked;
 
@@ -287,10 +312,12 @@ async function generate() {
       renderCompare(safe, upset);
       saveHistory(safe.prediction, 'safe', state.selected.id);
       saveHistory(upset.prediction, 'high-risk', state.selected.id);
+      persistResult({ mode: 'compare', safe, upset });
     } else {
       const data = await requestPrediction(answers);
       renderPrediction(data);
       saveHistory(data.prediction, answers.predictionStyle || 'balanced', state.selected.id);
+      persistResult({ mode: 'single', single: data });
     }
     $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (e) {
@@ -307,6 +334,41 @@ function requestPrediction(answers) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ matchId: state.selected.id, matchContext: state.context, answers }),
   });
+}
+
+/** Save the current selection + result so a refresh can restore the panels. */
+function persistResult(extra) {
+  saveLastResult({
+    savedAt: new Date().toISOString(),
+    matchId: state.selected?.id || null,
+    selected: state.selected,
+    context: state.context,
+    questions: state.questions,
+    answers: state.lastAnswers,
+    ...extra,
+  });
+}
+
+/** On page load, re-show the last selection, questions and prediction result. */
+function restoreLastResult() {
+  const last = getLastResult();
+  if (!last || !last.selected) return;
+  state.selected = last.selected;
+  state.context = last.context || null;
+  state.questions = last.questions || [];
+  state.lastAnswers = last.answers || null;
+
+  renderSelectedCard(last.selected);
+  if (state.questions.length) {
+    renderQuestions(state.questions, state.lastAnswers);
+    $('questionCard').classList.remove('hidden');
+  }
+  $('resultCard').classList.remove('hidden');
+  if (last.mode === 'compare' && last.safe && last.upset) {
+    renderCompare(last.safe, last.upset);
+  } else if (last.single) {
+    renderPrediction(last.single);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -677,6 +739,7 @@ function init() {
   loadStatus();
   loadMatches();
   renderHistory();
+  restoreLastResult();
 }
 
 document.addEventListener('DOMContentLoaded', init);
