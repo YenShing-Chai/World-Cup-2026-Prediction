@@ -1,0 +1,27 @@
+{
+  "name": "world-cup-2026-ai-predictor",
+  "version": "1.0.0",
+  "description": "Clean HTML web app that fetches FIFA World Cup 2026 fixtures and produces AI match predictions using a question-first flow.",
+  "type": "module",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "world-cup-2026",
+    "football",
+    "predictions",
+    "ai",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

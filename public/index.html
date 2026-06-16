@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>World Cup 2026 AI Predictor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- 1. HEADER -->
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <span class="ball" aria-hidden="true">⚽</span>
+        <div>
+          <h1>World Cup 2026 AI Predictor</h1>
+          <p class="subtitle">Select a match, answer a few questions, get an AI prediction.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap dashboard">
+    <!-- 2. DATA SOURCE STATUS -->
+    <section class="card status-card" id="statusCard">
+      <div class="status-row">
+        <div class="status-item">
+          <span class="status-label">Football provider</span>
+          <span class="status-value" id="statusProvider">—</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Data mode</span>
+          <span class="status-value" id="statusMode"><span class="badge badge-muted">loading…</span></span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">AI engine</span>
+          <span class="status-value" id="statusAi">—</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Last updated</span>
+          <span class="status-value" id="statusUpdated">—</span>
+        </div>
+        <button class="btn btn-ghost" id="planToggle" type="button">Why this source?</button>
+      </div>
+      <div class="decision-plan hidden" id="decisionPlan"></div>
+    </section>
+
+    <div class="grid">
+      <!-- 3. MATCH BROWSER -->
+      <section class="card" id="browserCard">
+        <div class="card-head">
+          <h2>Upcoming matches</h2>
+          <button class="btn btn-ghost" id="refreshBtn" type="button" title="Refresh fixtures">↻ Refresh</button>
+        </div>
+
+        <div class="filters">
+          <input type="search" id="searchInput" placeholder="Search team…" autocomplete="off" />
+          <select id="groupFilter" aria-label="Filter by group"><option value="">All groups</option></select>
+          <select id="dateFilter" aria-label="Filter by date"><option value="">All dates</option></select>
+          <select id="statusFilter" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="live">Live</option>
+            <option value="complete">Complete</option>
+          </select>
+        </div>
+
+        <div id="matchList" class="match-list">
+          <div class="empty">Loading fixtures…</div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN -->
+      <div class="right-col">
+        <!-- 4. SELECTED MATCH CARD -->
+        <section class="card hidden" id="selectedCard">
+          <div class="card-head"><h2>Selected match</h2></div>
+          <div id="selectedBody"></div>
+          <div class="action-row">
+            <button class="btn btn-primary" id="askBtn" type="button">Ask me questions →</button>
+          </div>
+        </section>
+
+        <!-- 5. AI QUESTION PANEL -->
+        <section class="card hidden" id="questionCard">
+          <div class="card-head"><h2>A few questions first</h2></div>
+          <p class="hint">The assistant asks before it predicts. Tweak these to shape the result.</p>
+          <form id="questionForm" class="question-form"></form>
+          <div class="action-row">
+            <label class="compare-toggle">
+              <input type="checkbox" id="compareToggle" />
+              Compare two styles (Safe vs Upset)
+            </label>
+            <button class="btn btn-primary" id="generateBtn" type="button">Get prediction</button>
+          </div>
+        </section>
+
+        <!-- 6. PREDICTION RESULT PANEL -->
+        <section class="card hidden" id="resultCard">
+          <div class="card-head">
+            <h2>Prediction</h2>
+            <button class="btn btn-ghost" id="rerunBtn" type="button">↻ Re-run</button>
+          </div>
+          <div id="resultBody"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 7. PREDICTION HISTORY -->
+    <section class="card" id="historyCard">
+      <div class="card-head">
+        <h2>Recent predictions</h2>
+        <button class="btn btn-ghost" id="clearHistoryBtn" type="button">Clear history</button>
+      </div>
+      <div id="historyList" class="history-list"><div class="empty">No predictions saved yet.</div></div>
+    </section>
+  </main>
+
+  <footer class="site-footer wrap">
+    <p>Analytical predictions only — not betting advice and never guaranteed. Built as a question-first football assistant.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

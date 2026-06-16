@@ -1,0 +1,10 @@
+# dependencies
+node_modules/
+
+# secrets — never commit real keys
+.env
+.env.local
+
+# logs / OS
+*.log
+.DS_Store
