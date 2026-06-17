@@ -30,9 +30,10 @@ status · selected-match card · AI clarifying questions · structured predictio
 alternative scenario, data sources, missing data, disclaimer) · betting-style
 markets incl. Over/Under 2.5, BTTS, Handicap and a dedicated **HT/FT double
 result** · localStorage history · **re-run** button · **compare two styles**
-(Safe vs Upset) · **auto-grading** of saved predictions (Correct/Wrong per market
-+ accuracy scoreboard) once the real result is in · all times shown in **Malaysia
-time (GMT+8)**.
+(Safe vs Upset) · **100-run Monte Carlo simulation** (AI-estimated expected goals
+→ Poisson sims → Win/Draw/Loss % with a bar chart) · **auto-grading** of saved
+predictions (Correct/Wrong per market + accuracy scoreboard) once the real result
+is in · sortable history · all times shown in **Malaysia time (GMT+8)**.
 
 ---
 
@@ -167,7 +168,6 @@ Fixtures are cached in memory for **15 minutes**.
 - Add injury-news API
 - Add lineup data
 - Add xG data
-- Add a Monte-Carlo simulation model
 - Add a user prediction leaderboard
 - Export predictions to CSV
 - Telegram / WhatsApp sharing

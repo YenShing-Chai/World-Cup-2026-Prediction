@@ -19,6 +19,7 @@ import { resolveMatches, planSources } from './dataSources/dataSourceSelector.js
 import { buildMatchContext } from './prediction/buildMatchContext.js';
 import { generateQuestions } from './prediction/questionGenerator.js';
 import { generatePrediction } from './prediction/predictionGenerator.js';
+import { simulate } from './prediction/simulate.js';
 
 dotenv.config();
 
@@ -206,6 +207,30 @@ app.post('/api/prediction/generate', async (req, res) => {
     });
 
     res.json({ engine, activeProvider, prediction });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Monte Carlo: run 100 Poisson simulations of the match. */
+app.post('/api/prediction/simulate', async (req, res) => {
+  try {
+    const { matchId, matchContext, runs } = req.body || {};
+    const data = await loadFixtures(false);
+    let context = matchContext;
+    if (!context && matchId) {
+      const match = data.matches.find((m) => m.id === matchId);
+      if (!match) return res.status(404).json({ error: 'Match not found' });
+      context = buildMatchContext(match, data.activeProvider);
+    }
+    if (!context) return res.status(400).json({ error: 'matchId or matchContext required' });
+
+    const sim = await simulate({
+      matchContext: context,
+      ai: aiEnv(),
+      runs: Math.min(Math.max(Number(runs) || 100, 10), 1000),
+    });
+    res.json({ activeProvider: data.activeProvider, simulation: sim });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

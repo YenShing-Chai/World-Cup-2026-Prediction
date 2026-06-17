@@ -70,4 +70,27 @@ export function buildUserPrompt(matchContext, answers, activeProvider) {
   ].join('\n');
 }
 
-export default { SYSTEM_PROMPT, buildUserPrompt };
+/* --------------------------------------------------------------------------
+ * Monte Carlo simulation: ask the AI ONLY for each team's expected goals
+ * (lambda), which the backend then feeds into a Poisson simulation.
+ * ------------------------------------------------------------------------ */
+export const SIM_SYSTEM_PROMPT = `You are a football analyst estimating expected goals for a single match.
+
+Given the structured match context, estimate the EXPECTED number of goals (an average, not a single scoreline) each team is likely to score, as decimals — typically between 0.3 and 3.2. Account for team strength, form and home/venue factors present in the context. If data is missing, lean on general international reputation and keep estimates conservative.
+
+Output ONLY a single valid JSON object, no markdown or commentary:
+{
+  "expectedGoals": { "home": 0.0, "away": 0.0 },
+  "rationale": "one short sentence"
+}`;
+
+export function buildSimPrompt(matchContext) {
+  return [
+    'MATCH CONTEXT (structured):',
+    JSON.stringify(matchContext, null, 2),
+    '',
+    'Estimate each team\'s expected goals now and return the JSON.',
+  ].join('\n');
+}
+
+export default { SYSTEM_PROMPT, buildUserPrompt, SIM_SYSTEM_PROMPT, buildSimPrompt };

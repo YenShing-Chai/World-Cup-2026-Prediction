@@ -231,6 +231,8 @@ async function selectMatch(id) {
   // reset downstream panels
   $('questionCard').classList.add('hidden');
   $('resultCard').classList.add('hidden');
+  $('simPanel').classList.add('hidden');
+  $('simResult').innerHTML = '';
 
   renderSelectedCard(match);
   $('selectedCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -349,6 +351,7 @@ async function generate() {
       saveHistory(data.prediction, answers.predictionStyle || 'balanced', state.selected.id);
       persistResult({ mode: 'single', single: data });
     }
+    showSimPanel();
     $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (e) {
     $('resultBody').innerHTML = `<div class="error-box">Prediction failed: ${e.message}</div>`;
@@ -399,6 +402,7 @@ function restoreLastResult() {
   } else if (last.single) {
     renderPrediction(last.single);
   }
+  showSimPanel();
 }
 
 /* ------------------------------------------------------------------ */
@@ -459,6 +463,60 @@ function predictionHTML(p, engine) {
 
 function renderPrediction(data) {
   $('resultBody').innerHTML = predictionHTML(data.prediction, data.engine);
+}
+
+/* ------------------------------------------------------------------ */
+/* Monte Carlo simulation                                             */
+/* ------------------------------------------------------------------ */
+function showSimPanel() {
+  // Available whenever we have a match context to simulate.
+  if (!state.context) return;
+  $('simPanel').classList.remove('hidden');
+  $('simResult').innerHTML = '';
+}
+
+async function runSimulation() {
+  if (!state.selected || !state.context) return;
+  const btn = $('simBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Simulating…';
+  $('simResult').innerHTML = '';
+  try {
+    const data = await api('/api/prediction/simulate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ matchId: state.selected.id, matchContext: state.context, runs: 100 }),
+    });
+    renderSimulation(data.simulation);
+  } catch (e) {
+    $('simResult').innerHTML = `<div class="error-box">Simulation failed: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🎲 Run 100 simulations';
+  }
+}
+
+function renderSimulation(s) {
+  const home = state.context.match.homeTeam;
+  const away = state.context.match.awayTeam;
+  const eg = s.expectedGoals;
+  $('simResult').innerHTML = `
+    <div class="sim-head">
+      <b>${s.runs} simulations</b> · expected goals
+      ${home} <b>${eg.home}</b> – <b>${eg.away}</b> ${away}
+      <span class="sim-src">${s.source === 'ai' ? 'AI-estimated' : 'heuristic'}</span>
+    </div>
+    <div class="sim-bar" role="img" aria-label="Win Draw Loss distribution">
+      ${s.homeWinPct ? `<div class="sim-seg seg-home" style="width:${s.homeWinPct}%">${s.homeWinPct}%</div>` : ''}
+      ${s.drawPct ? `<div class="sim-seg seg-draw" style="width:${s.drawPct}%">${s.drawPct}%</div>` : ''}
+      ${s.awayWinPct ? `<div class="sim-seg seg-away" style="width:${s.awayWinPct}%">${s.awayWinPct}%</div>` : ''}
+    </div>
+    <div class="sim-legend">
+      <span><i class="dot dot-home"></i> ${home} win — <b>${s.homeWinPct}%</b> (${s.homeWin})</span>
+      <span><i class="dot dot-draw"></i> Draw — <b>${s.drawPct}%</b> (${s.draw})</span>
+      <span><i class="dot dot-away"></i> ${away} win — <b>${s.awayWinPct}%</b> (${s.awayWin})</span>
+    </div>
+    ${s.rationale ? `<p class="q-help">${s.rationale}</p>` : ''}`;
 }
 
 function renderCompare(safe, upset) {
@@ -757,6 +815,7 @@ function init() {
   $('askBtn').addEventListener('click', askQuestions);
   $('generateBtn').addEventListener('click', generate);
   $('rerunBtn').addEventListener('click', generate);
+  $('simBtn').addEventListener('click', runSimulation);
   $('planToggle').addEventListener('click', () => $('decisionPlan').classList.toggle('hidden'));
   $('clearHistoryBtn').addEventListener('click', () => {
     if (!confirm('Clear all saved predictions and their results?')) return;
