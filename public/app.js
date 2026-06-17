@@ -519,6 +519,7 @@ function saveHistory(prediction, style, matchId) {
   hist.unshift({
     id: 'p' + Date.now() + Math.random().toString(36).slice(2, 7),
     when: new Date().toISOString(),
+    kickoff: state.selected?.kickoffUtc || null, // match date, used to sort the table
     matchId: matchId || null,
     homeTeam: prediction.match.homeTeam,
     awayTeam: prediction.match.awayTeam,
@@ -641,7 +642,12 @@ function renderHistory() {
     return;
   }
 
-  const rows = hist
+  // Order by match date, earliest kickoff first (fall back to when-predicted).
+  const sorted = hist
+    .slice()
+    .sort((a, b) => new Date(a.kickoff || a.when) - new Date(b.kickoff || b.when));
+
+  const rows = sorted
     .map((h) => {
       const verdict = !h.settled
         ? '<span class="badge badge-pending">PENDING</span>'
@@ -661,7 +667,7 @@ function renderHistory() {
       return `<tr>
         <td class="t-match">
           <div><b>${h.match}</b></div>
-          <div class="t-sub">${fmtDateTime(h.when, { year: 'numeric' })} · ${h.style} · ${h.confidence}%${h.manual ? ' · manual' : ''}</div>
+          <div class="t-sub">${h.kickoff ? fmtDateTime(h.kickoff) : fmtDateTime(h.when, { year: 'numeric' })} · ${h.style} · ${h.confidence}%</div>
         </td>
         <td class="t-cell">
           <span class="t-pred">${predHT}</span><span class="t-arrow">→</span><span class="t-act ${cellClass(h.grades?.halfTime)}">${actHT}</span>
