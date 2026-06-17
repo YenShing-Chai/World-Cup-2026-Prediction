@@ -112,6 +112,16 @@
       <div class="card-head">
         <h2>Recent predictions</h2>
         <div class="head-actions">
+          <label class="sort-control">
+            <span>Sort by</span>
+            <select id="sortBy" aria-label="Sort predictions by">
+              <option value="date">Match date</option>
+              <option value="confidence">Confidence</option>
+              <option value="verdict">Verdict</option>
+              <option value="added">Recently added</option>
+            </select>
+          </label>
+          <button class="btn btn-ghost" id="sortDir" type="button" title="Toggle ascending / descending">↑ Asc</button>
           <button class="btn btn-primary" id="checkResultsBtn" type="button" title="Fetch final scores and grade predictions">✓ Check results</button>
           <button class="btn btn-ghost" id="clearHistoryBtn" type="button">Clear history</button>
         </div>

@@ -36,6 +36,18 @@ const state = {
   lastAnswers: null,
   activeProvider: null,
   dateInit: false, // has the date filter been defaulted to today yet?
+  sortBy: 'date',
+  sortDir: 'asc',
+};
+
+const SORT_KEY = 'wc2026.sort.v1';
+
+// How each sort option ranks a history record (higher = "more").
+const SORTS = {
+  date: (h) => new Date(h.kickoff || h.when).getTime() || 0,
+  confidence: (h) => h.confidence || 0,
+  verdict: (h) => (h.settled ? (h.grades?.outcome ? 2 : 1) : 0), // correct > wrong > pending
+  added: (h) => new Date(h.when).getTime() || 0,
 };
 
 /** Today's date key in Malaysia time (GMT+8), YYYY-MM-DD. */
@@ -642,10 +654,10 @@ function renderHistory() {
     return;
   }
 
-  // Order by match date, earliest kickoff first (fall back to when-predicted).
-  const sorted = hist
-    .slice()
-    .sort((a, b) => new Date(a.kickoff || a.when) - new Date(b.kickoff || b.when));
+  // Order by the chosen field + direction (default: match date, earliest first).
+  const keyFn = SORTS[state.sortBy] || SORTS.date;
+  const dir = state.sortDir === 'desc' ? -1 : 1;
+  const sorted = hist.slice().sort((a, b) => (keyFn(a) - keyFn(b)) * dir);
 
   const rows = sorted
     .map((h) => {
@@ -753,10 +765,46 @@ function init() {
   });
   $('checkResultsBtn').addEventListener('click', settleAll);
 
+  // Sort controls (persisted across sessions).
+  loadSortPref();
+  $('sortBy').addEventListener('change', (e) => {
+    state.sortBy = e.target.value;
+    saveSortPref();
+    renderHistory();
+  });
+  $('sortDir').addEventListener('click', () => {
+    state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    updateSortDirBtn();
+    saveSortPref();
+    renderHistory();
+  });
+
   loadStatus();
   loadMatches();
   renderHistory();
   restoreLastResult();
+}
+
+function updateSortDirBtn() {
+  $('sortDir').textContent = state.sortDir === 'asc' ? '↑ Asc' : '↓ Desc';
+}
+
+function loadSortPref() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SORT_KEY) || 'null');
+    if (s && SORTS[s.sortBy]) {
+      state.sortBy = s.sortBy;
+      state.sortDir = s.sortDir === 'desc' ? 'desc' : 'asc';
+    }
+  } catch {}
+  $('sortBy').value = state.sortBy;
+  updateSortDirBtn();
+}
+
+function saveSortPref() {
+  try {
+    localStorage.setItem(SORT_KEY, JSON.stringify({ sortBy: state.sortBy, sortDir: state.sortDir }));
+  } catch {}
 }
 
 document.addEventListener('DOMContentLoaded', init);

@@ -176,7 +176,10 @@ input:focus, select:focus { outline: 2px solid var(--brand-2); border-color: var
 .compare-col h4 { margin: 0 0 8px; }
 
 /* History */
-.head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sort-control { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); }
+.sort-control select { width: auto; padding: 8px 10px; }
+#sortDir { white-space: nowrap; }
 
 /* Tabulated history */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
