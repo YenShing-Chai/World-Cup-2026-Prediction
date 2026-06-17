@@ -614,25 +614,6 @@ async function settleAll() {
   flash(btn, `Settled ${settledCount}${notFinished ? ` · ${notFinished} not finished yet` : ''}`);
 }
 
-/** Manual settle from typed FT (and optional HT) score. */
-function settleManual(id, ftStr, htStr) {
-  const hist = getHistory();
-  const rec = hist.find((h) => h.id === id);
-  if (!rec) return;
-  const ft = parseScoreStr(ftStr);
-  if (!ft) {
-    alert('Enter the full-time score like 2-1');
-    return;
-  }
-  const ht = parseScoreStr(htStr);
-  rec.actual = { ft: { home: ft[0], away: ft[1] }, ht: ht ? { home: ht[0], away: ht[1] } : null };
-  rec.grades = gradePrediction(rec, rec.actual);
-  rec.settled = true;
-  rec.manual = true;
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
-  renderHistory();
-}
-
 function flash(btn, msg) {
   const prev = btn.textContent;
   btn.textContent = msg;
@@ -673,13 +654,9 @@ function renderHistory() {
       const actHT = h.settled ? (h.actual.ht ? `${h.actual.ht.home}-${h.actual.ht.away}` : 'n/a') : '—';
       const actFT = h.settled ? `${h.actual.ft.home}-${h.actual.ft.away}` : '—';
 
-      const markets = h.settled
+      const results = h.settled
         ? `${gBadge('Outcome', h.grades.outcome)} ${gBadge('Score', h.grades.score)} ${gBadge('HT', h.grades.halfTime)} ${gBadge('HT/FT', h.grades.htft)} ${gBadge('O/U 2.5', h.grades.ou25)} ${gBadge('BTTS', h.grades.btts)}`
-        : `<div class="manual-entry">
-             <input class="me-ft" data-id="${h.id}" placeholder="FT e.g. 2-1" />
-             <input class="me-ht" data-id="${h.id}" placeholder="HT 1-0 (opt)" />
-             <button class="btn btn-ghost me-go" data-id="${h.id}" type="button">Grade</button>
-           </div>`;
+        : '<span class="t-awaiting">Awaiting result — tap “Check results”</span>';
 
       return `<tr>
         <td class="t-match">
@@ -693,7 +670,7 @@ function renderHistory() {
           <span class="t-pred">${predFT}</span><span class="t-arrow">→</span><span class="t-act ${cellClass(h.grades?.outcome)}">${actFT}</span>
         </td>
         <td class="t-verdict">${verdict}</td>
-        <td class="t-markets">${markets}</td>
+        <td class="t-markets">${results}</td>
       </tr>`;
     })
     .join('');
@@ -707,22 +684,12 @@ function renderHistory() {
             <th>1st Half<span class="th-sub">pred → actual</span></th>
             <th>Full Time<span class="th-sub">pred → actual</span></th>
             <th>Verdict</th>
-            <th>Markets</th>
+            <th>Results</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
-
-  // wire manual-entry buttons
-  list.querySelectorAll('.me-go').forEach((b) =>
-    b.addEventListener('click', () => {
-      const id = b.dataset.id;
-      const ft = list.querySelector(`.me-ft[data-id="${id}"]`).value;
-      const ht = list.querySelector(`.me-ht[data-id="${id}"]`).value;
-      settleManual(id, ft, ht);
-    })
-  );
 }
 
 function renderScoreboard(hist) {
