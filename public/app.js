@@ -35,7 +35,11 @@ const state = {
   questions: [],
   lastAnswers: null,
   activeProvider: null,
+  dateInit: false, // has the date filter been defaulted to today yet?
 };
+
+/** Today's date key in Malaysia time (GMT+8), YYYY-MM-DD. */
+const todayKey = () => new Date().toLocaleDateString('en-CA', { timeZone: DISPLAY_TZ });
 
 /* ------------------------------------------------------------------ */
 /* API helpers                                                        */
@@ -106,6 +110,8 @@ async function loadMatches(refresh = false) {
 function buildFilterOptions() {
   const groups = [...new Set(state.matches.map((m) => m.group).filter(Boolean))].sort();
   const dates = [...new Set(state.matches.map((m) => myDateKey(m.kickoffUtc)).filter(Boolean))].sort();
+  const prevDate = $('dateFilter').value;
+
   $('groupFilter').innerHTML =
     '<option value="">All groups</option>' + groups.map((g) => `<option>${g}</option>`).join('');
   $('dateFilter').innerHTML =
@@ -113,6 +119,18 @@ function buildFilterOptions() {
     dates
       .map((d) => `<option value="${d}">${new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}</option>`)
       .join('');
+
+  if (!state.dateInit) {
+    // On first load, default to today (GMT+8); if no matches today, jump to the
+    // next match day so the list isn't empty. User can switch to "All dates".
+    const today = todayKey();
+    const upcoming = dates.filter((d) => d >= today).sort();
+    $('dateFilter').value = dates.includes(today) ? today : upcoming[0] || '';
+    state.dateInit = true;
+  } else if (prevDate && dates.includes(prevDate)) {
+    // preserve the user's current selection across refreshes
+    $('dateFilter').value = prevDate;
+  }
 }
 
 function applyFilters() {
@@ -512,6 +530,7 @@ function saveHistory(prediction, style, matchId) {
       resultType: p.resultType,
       score: p.predictedScore,
       htResult: p.halfTime?.result || null,
+      htScore: p.halfTime?.score || null,
       htft: p.htft?.pick || null,
       ou25: p.markets?.overUnder25 || 'n/a',
       btts: p.markets?.btts || 'n/a',
@@ -626,6 +645,11 @@ function gBadge(label, val) {
   return `<span class="mk ${cls}">${label} ${mark}</span>`;
 }
 
+/** Colour an actual cell green/red by its grade (null = neutral). */
+function cellClass(grade) {
+  return grade === true ? 't-ok' : grade === false ? 't-no' : '';
+}
+
 function renderHistory() {
   const hist = getHistory();
   const list = $('historyList');
@@ -636,39 +660,59 @@ function renderHistory() {
     return;
   }
 
-  list.innerHTML = hist
+  const rows = hist
     .map((h) => {
-      const headline = !h.settled
+      const verdict = !h.settled
         ? '<span class="badge badge-pending">PENDING</span>'
         : h.grades?.outcome
         ? '<span class="badge badge-correct">CORRECT</span>'
         : '<span class="badge badge-wrong">WRONG</span>';
-      const actualLine = h.settled
-        ? ` · actual ${h.actual.ft.home}–${h.actual.ft.away}${h.actual.ht ? ` (HT ${h.actual.ht.home}–${h.actual.ht.away})` : ''}${h.manual ? ' · manual' : ''}`
-        : '';
-      const grid = h.settled
-        ? `<div class="mk-row">
-             ${gBadge('Outcome', h.grades.outcome)}
-             ${gBadge('Score', h.grades.score)}
-             ${gBadge('HT', h.grades.halfTime)}
-             ${gBadge('HT/FT', h.grades.htft)}
-             ${gBadge('O/U 2.5', h.grades.ou25)}
-             ${gBadge('BTTS', h.grades.btts)}
-           </div>`
+
+      const predHT = h.predicted.htScore || '—';
+      const predFT = h.predicted.score || '—';
+      const actHT = h.settled ? (h.actual.ht ? `${h.actual.ht.home}-${h.actual.ht.away}` : 'n/a') : '—';
+      const actFT = h.settled ? `${h.actual.ft.home}-${h.actual.ft.away}` : '—';
+
+      const markets = h.settled
+        ? `${gBadge('Outcome', h.grades.outcome)} ${gBadge('Score', h.grades.score)} ${gBadge('HT', h.grades.halfTime)} ${gBadge('HT/FT', h.grades.htft)} ${gBadge('O/U 2.5', h.grades.ou25)} ${gBadge('BTTS', h.grades.btts)}`
         : `<div class="manual-entry">
              <input class="me-ft" data-id="${h.id}" placeholder="FT e.g. 2-1" />
-             <input class="me-ht" data-id="${h.id}" placeholder="HT 1-0 (optional)" />
+             <input class="me-ht" data-id="${h.id}" placeholder="HT 1-0 (opt)" />
              <button class="btn btn-ghost me-go" data-id="${h.id}" type="button">Grade</button>
            </div>`;
-      return `<div class="history-row">
-        <div class="hr-main">
-          <div class="hr-title"><b>${h.match}</b> — ${h.predicted.winner} (${h.predicted.score}) ${headline}</div>
-          <div class="h-meta">${fmtDateTime(h.when, { year: 'numeric' })} · ${h.style} · ${h.confidence}% conf.${actualLine}</div>
-          ${grid}
-        </div>
-      </div>`;
+
+      return `<tr>
+        <td class="t-match">
+          <div><b>${h.match}</b></div>
+          <div class="t-sub">${fmtDateTime(h.when, { year: 'numeric' })} · ${h.style} · ${h.confidence}%${h.manual ? ' · manual' : ''}</div>
+        </td>
+        <td class="t-cell">
+          <span class="t-pred">${predHT}</span><span class="t-arrow">→</span><span class="t-act ${cellClass(h.grades?.halfTime)}">${actHT}</span>
+        </td>
+        <td class="t-cell">
+          <span class="t-pred">${predFT}</span><span class="t-arrow">→</span><span class="t-act ${cellClass(h.grades?.outcome)}">${actFT}</span>
+        </td>
+        <td class="t-verdict">${verdict}</td>
+        <td class="t-markets">${markets}</td>
+      </tr>`;
     })
     .join('');
+
+  list.innerHTML = `
+    <div class="table-scroll">
+      <table class="hist-table">
+        <thead>
+          <tr>
+            <th>Match</th>
+            <th>1st Half<span class="th-sub">pred → actual</span></th>
+            <th>Full Time<span class="th-sub">pred → actual</span></th>
+            <th>Verdict</th>
+            <th>Markets</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 
   // wire manual-entry buttons
   list.querySelectorAll('.me-go').forEach((b) =>

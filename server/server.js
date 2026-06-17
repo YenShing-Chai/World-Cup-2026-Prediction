@@ -88,14 +88,27 @@ app.get('/api/status', async (_req, res) => {
   }
 });
 
+/**
+ * Set CDN/edge cache headers. On stateless hosts (Vercel) this caches a GOOD
+ * response at the edge so the upstream football API is hit at most ~once per
+ * window across all users — avoiding its rate limit. A mock/fallback response is
+ * never cached, so the app retries real data on the very next request.
+ */
+function setEdgeCache(res, { isMock, seconds = 900 }) {
+  if (isMock) res.set('Cache-Control', 'no-store');
+  else res.set('Cache-Control', `public, s-maxage=${seconds}, stale-while-revalidate=600`);
+}
+
 /** Upcoming fixtures. ?refresh=1 bypasses the cache. */
 app.get('/api/matches/upcoming', async (req, res) => {
   try {
     const force = req.query.refresh === '1' || req.query.refresh === 'true';
     const data = await loadFixtures(force);
+    const isMock = data.meta?.isMock === true || data.activeProvider === 'mock';
+    setEdgeCache(res, { isMock: isMock || force });
     res.json({
       activeProvider: data.activeProvider,
-      isMock: data.meta?.isMock === true || data.activeProvider === 'mock',
+      isMock,
       providerName: data.meta?.name || data.activeProvider,
       source: data.source,
       lastUpdated: data.lastUpdated,
@@ -115,6 +128,7 @@ app.get('/api/matches/:id/context', async (req, res) => {
     const match = data.matches.find((m) => m.id === req.params.id);
     if (!match) return res.status(404).json({ error: 'Match not found' });
     const context = buildMatchContext(match, data.activeProvider);
+    setEdgeCache(res, { isMock: data.activeProvider === 'mock' });
     res.json({ activeProvider: data.activeProvider, context });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -128,6 +142,9 @@ app.get('/api/matches/:id/result', async (req, res) => {
     const match = data.matches.find((m) => m.id === req.params.id);
     if (!match) return res.json({ found: false });
     const finished = match.status === 'complete' && match.homeScore != null && match.awayScore != null;
+    // Final results never change once finished; cache those. Don't cache mock or
+    // not-yet-finished results (the score is still pending).
+    setEdgeCache(res, { isMock: data.activeProvider === 'mock' || !finished, seconds: 600 });
     res.json({
       found: true,
       status: match.status,

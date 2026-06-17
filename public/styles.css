@@ -177,12 +177,27 @@ input:focus, select:focus { outline: 2px solid var(--brand-2); border-color: var
 
 /* History */
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.history-list { display: flex; flex-direction: column; gap: 8px; }
-.history-row { display: flex; justify-content: space-between; gap: 10px; padding: 10px 13px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); font-size: 0.86rem; }
-.history-row .h-meta { color: var(--muted); font-size: 0.76rem; margin-top: 2px; }
-.hr-main { width: 100%; }
-.hr-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Tabulated history */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hist-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; min-width: 640px; }
+.hist-table thead th { text-align: left; padding: 8px 10px; color: var(--muted);
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+  border-bottom: 1px solid var(--line); white-space: nowrap; }
+.hist-table .th-sub { display: block; text-transform: none; letter-spacing: 0; font-weight: 400;
+  font-size: 0.66rem; color: var(--muted); opacity: 0.7; margin-top: 1px; }
+.hist-table tbody td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.hist-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+.t-match b { color: var(--text); }
+.t-sub { color: var(--muted); font-size: 0.72rem; margin-top: 2px; }
+.t-cell { white-space: nowrap; }
+.t-pred { color: var(--muted); font-weight: 600; }
+.t-arrow { color: var(--muted); margin: 0 6px; opacity: 0.6; }
+.t-act { font-weight: 800; }
+.t-act.t-ok { color: var(--brand); }
+.t-act.t-no { color: var(--danger); }
+.t-markets { min-width: 230px; }
+.t-markets .mk { display: inline-block; margin: 2px 3px 2px 0; }
 
 .badge-correct { background: rgba(24,180,107,.16); color: var(--brand); border: 1px solid rgba(24,180,107,.5); }
 .badge-correct::before { content: "✓ "; }
