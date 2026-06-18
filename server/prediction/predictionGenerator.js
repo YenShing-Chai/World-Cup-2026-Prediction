@@ -145,23 +145,20 @@ function heuristicPrediction(ctx, answers, activeProvider) {
       ? '2-1'
       : '1-2';
 
-  // Half-time tends to be lower-scoring and more often level. A clear favourite
-  // (large |diff|) is more likely to already lead at the break.
-  let halfTime;
-  if (Math.abs(diff) >= 12) {
-    halfTime =
-      resultType === 'home_win'
-        ? { result: 'home_lead', score: '1-0' }
-        : resultType === 'away_win'
-        ? { result: 'away_lead', score: '0-1' }
-        : { result: 'draw', score: '0-0' };
-  } else {
-    halfTime = { result: 'draw', score: '0-0' };
-  }
+  // Derive a plausible half-time score from the predicted full-time score:
+  // each team gets ~half its FT goals (rounded down), so a 2-0 -> 1-0, a 2-1 ->
+  // 1-0, a 1-1 -> 0-0. The side leading at FT therefore usually leads at HT too.
+  const [pfH, pfA] = predictedScore.split('-').map((n) => parseInt(n, 10) || 0);
+  const htH = Math.floor(pfH / 2);
+  const htA = Math.floor(pfA / 2);
+  const halfTime = {
+    result: htH > htA ? 'home_lead' : htH < htA ? 'away_lead' : 'draw',
+    score: `${htH}-${htA}`,
+  };
   halfTime.note =
     halfTime.result === 'draw'
-      ? 'Expect a cagey, level first half before the game opens up.'
-      : `${winner} projected to take an early lead but not put it away before the break.`;
+      ? 'Projected level at the break before the game opens up.'
+      : `${halfTime.result === 'home_lead' ? home.name : away.name} projected to lead at the break.`;
 
   // Half-Time/Full-Time double result (from the home team's perspective).
   const htCode = halfTime.result === 'home_lead' ? 'Home' : halfTime.result === 'away_lead' ? 'Away' : 'Draw';

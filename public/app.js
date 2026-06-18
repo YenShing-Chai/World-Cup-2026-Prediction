@@ -650,7 +650,16 @@ function gradePrediction(rec, actual) {
   return g;
 }
 
-/** Auto-settle: fetch results for all unsettled predictions with a matchId. */
+/** Build an actual-result object from a loaded fixture, or null if not final. */
+function actualFromMatch(m) {
+  if (!m || m.status !== 'complete' || m.homeScore == null || m.awayScore == null) return null;
+  return {
+    ft: { home: m.homeScore, away: m.awayScore },
+    ht: m.htHomeScore != null && m.htAwayScore != null ? { home: m.htHomeScore, away: m.htAwayScore } : null,
+  };
+}
+
+/** Auto-settle all unsettled predictions. */
 async function settleAll() {
   const btn = $('checkResultsBtn');
   const hist = getHistory();
@@ -661,28 +670,49 @@ async function settleAll() {
   }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Checking…';
+
+  // Refresh fixtures so we have the latest scores (keep real data if the refresh
+  // happens to fall back to mock — don't overwrite a good list with mock).
+  try {
+    const fresh = await api('/api/matches/upcoming');
+    if (fresh.matches && fresh.matches.length && !fresh.isMock) state.matches = fresh.matches;
+  } catch {}
+
   let settledCount = 0;
   let notFinished = 0;
+  let notFound = 0;
+
   for (const rec of pending) {
-    try {
-      const r = await api(`/api/matches/${rec.matchId}/result`);
-      if (r.found && r.finished && r.ft) {
-        rec.actual = { ft: r.ft, ht: r.ht || null };
-        rec.grades = gradePrediction(rec, rec.actual);
-        rec.settled = true;
-        settledCount++;
-      } else {
-        notFinished++;
+    let actual = actualFromMatch(state.matches.find((x) => x.id === rec.matchId));
+
+    // Fallback to the per-match endpoint only if the loaded list didn't have it.
+    if (!actual) {
+      try {
+        const r = await api(`/api/matches/${rec.matchId}/result`);
+        if (r.found && r.finished && r.ft) actual = { ft: r.ft, ht: r.ht || null };
+        else if (r.found) notFinished++;
+        else notFound++;
+      } catch {
+        notFound++;
       }
-    } catch {
-      notFinished++;
+    }
+
+    if (actual) {
+      rec.actual = actual;
+      rec.grades = gradePrediction(rec, actual);
+      rec.settled = true;
+      settledCount++;
     }
   }
+
   localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
   renderHistory();
   btn.disabled = false;
   btn.textContent = '✓ Check results';
-  flash(btn, `Settled ${settledCount}${notFinished ? ` · ${notFinished} not finished yet` : ''}`);
+  const parts = [`Settled ${settledCount}`];
+  if (notFinished) parts.push(`${notFinished} not finished`);
+  if (notFound) parts.push(`${notFound} unavailable`);
+  flash(btn, parts.join(' · '));
 }
 
 function flash(btn, msg) {
