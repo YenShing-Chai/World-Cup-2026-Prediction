@@ -259,4 +259,55 @@ input:focus, select:focus { outline: 2px solid var(--brand-2); border-color: var
 .error-box { color: var(--danger); background: rgba(239,93,107,.1); border: 1px solid rgba(239,93,107,.35);
   border-radius: 10px; padding: 11px 13px; font-size: 0.85rem; }
 
+/* Parlay / bet slip */
+.slip-count-badge { font-size: 0.72rem; font-weight: 700; color: var(--muted); background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; margin-left: 8px; vertical-align: middle; }
+.slip-flash { color: var(--brand); font-size: 0.8rem; font-weight: 600; margin-right: 4px; }
+
+/* Add-to-slip buttons inside a prediction */
+.slip-add-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.slip-add-btn { display: flex; align-items: center; gap: 12px; text-align: left; color: var(--text);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px;
+  cursor: pointer; transition: .12s; }
+.slip-add-btn:hover { border-color: var(--brand); background: #15233c; }
+.slip-add-btn.added { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
+.slip-add-btn .sab-txt { display: flex; flex-direction: column; gap: 1px; }
+.slip-add-btn .sab-mk { font-size: 0.64rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.slip-add-btn .sab-pick { font-weight: 600; font-size: 0.85rem; }
+.slip-add-btn .sab-odds { margin-left: auto; font-weight: 800; color: var(--accent); font-size: 0.92rem; text-align: right; }
+.slip-add-btn .sab-odds small { display: block; font-weight: 600; font-size: 0.6rem; color: var(--muted); }
+.slip-add-btn .sab-plus { font-weight: 800; color: var(--brand); font-size: 1.1rem; }
+.est { font-style: normal; font-size: 0.58rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; margin-left: 5px; vertical-align: 1px; }
+
+/* Slip legs */
+.slip-body { display: flex; flex-direction: column; gap: 8px; }
+.slip-leg { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--bg-2); padding: 10px 13px; }
+.slip-leg.leg-won { border-color: rgba(24,180,107,.5); background: rgba(24,180,107,.07); }
+.slip-leg.leg-lost { border-color: rgba(239,93,107,.45); background: rgba(239,93,107,.06); }
+.slip-leg-main { min-width: 0; }
+.slip-leg-match { font-weight: 700; font-size: 0.92rem; }
+.slip-leg-kick { font-weight: 500; color: var(--muted); font-size: 0.72rem; margin-left: 8px; }
+.slip-leg-pick { color: var(--muted); font-size: 0.82rem; margin-top: 3px; }
+.slip-leg-pick b { color: var(--text); }
+.slip-mk-tag { font-size: 0.62rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; margin-right: 7px; }
+.slip-leg-actual { color: var(--text); font-weight: 600; margin-left: 8px; }
+.slip-leg-right { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.slip-leg-odds { font-weight: 800; color: var(--accent); font-size: 0.95rem; text-align: right; }
+.slip-leg-odds small { display: block; font-size: 0.6rem; color: var(--muted); font-weight: 600; }
+.slip-leg-x { border: 1px solid var(--line); background: transparent; color: var(--muted);
+  border-radius: 8px; width: 28px; height: 28px; cursor: pointer; font-size: 0.8rem; flex: none; }
+.slip-leg-x:hover { border-color: var(--danger); color: var(--danger); }
+
+/* Slip footer */
+.slip-footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 26px;
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.slip-stat { display: flex; flex-direction: column; gap: 4px; }
+.slip-stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.slip-stat-val { font-weight: 800; font-size: 1.15rem; }
+.slip-stat-val.accent { color: var(--accent); }
+.slip-stake-wrap input { width: 92px; padding: 6px 9px; font-weight: 700; }
+
 .site-footer { padding: 20px 0 40px; color: var(--muted); font-size: 0.8rem; text-align: center; }

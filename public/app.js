@@ -3,6 +3,7 @@
 
 const HISTORY_KEY = 'wc2026.predictions.v1';
 const LAST_KEY = 'wc2026.lastResult.v1';
+const SLIP_KEY = 'wc2026.slip.v1';
 const $ = (id) => document.getElementById(id);
 
 /* Persist the most recent prediction so it survives a browser refresh. */
@@ -38,6 +39,7 @@ const state = {
   dateInit: false, // has the date filter been defaulted to today yet?
   sortBy: 'date',
   sortDir: 'asc',
+  slip: { legs: [], stake: 10 }, // parlay / bet slip (cross-match accumulator)
 };
 
 const SORT_KEY = 'wc2026.sort.v1';
@@ -429,6 +431,8 @@ function predictionHTML(p, engine) {
 
     ${htftSection(p)}
 
+    ${slipAddSection(p)}
+
     <div class="result-section">
       <h3>Key reasoning</h3>
       <ul>${(p.reasoning || []).map((r) => `<li>${r}</li>`).join('')}</ul>
@@ -570,6 +574,314 @@ function htftSection(p) {
       ${h.note ? `<p class="q-help">${h.note}</p>` : ''}
       ${alts ? `<div class="tag-list" style="margin-top:6px"><span class="tag tag-label">alternatives</span>${alts}</div>` : ''}
     </div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Parlay / bet slip                                                  */
+/* ------------------------------------------------------------------ */
+const clampN = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const escapeAttr = (s) =>
+  String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** Implied decimal odds for a leg from its win probability (percent). */
+function impliedOdds(prob) {
+  return 100 / clampN(Number(prob) || 1, 1, 99);
+}
+
+/** Rough O/U 2.5 confidence from how decisive the predicted total is. */
+function estProbOU(scoreStr) {
+  const sc = parseScoreStr(scoreStr);
+  const total = sc ? sc[0] + sc[1] : 2;
+  return clampN(Math.round(52 + Math.abs(total - 2.5) * 9), 52, 78);
+}
+/** Rough BTTS confidence — clearer scorelines read a bit more confidently. */
+function estProbBTTS(scoreStr) {
+  const sc = parseScoreStr(scoreStr);
+  if (!sc) return 55;
+  return clampN(Math.round(56 + Math.abs(sc[0] - sc[1]) * 3), 52, 74);
+}
+
+function loadSlip() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SLIP_KEY) || 'null');
+    if (s && Array.isArray(s.legs)) {
+      state.slip.legs = s.legs;
+      state.slip.stake = Number(s.stake) >= 0 ? Number(s.stake) : 10;
+    }
+  } catch {}
+}
+function saveSlip() {
+  try { localStorage.setItem(SLIP_KEY, JSON.stringify(state.slip)); } catch {}
+}
+
+/** Build the "Add to parlay slip" block shown inside a prediction. */
+function slipAddSection(p) {
+  const mid = state.selected?.id;
+  if (!mid) return '';
+  const pr = p.prediction;
+  const home = p.match.homeTeam;
+  const away = p.match.awayTeam;
+
+  const specs = [
+    {
+      mk: 'result', label: 'Match Result',
+      pick: pr.resultType,
+      plabel: pr.resultType === 'draw' ? 'Draw' : `${pr.winner} to win`,
+      prob: Math.round(pr.confidence), est: false,
+    },
+  ];
+  if (pr.htft?.pick) {
+    specs.push({
+      mk: 'htft', label: 'HT/FT',
+      pick: pr.htft.pick, plabel: htftWords(pr.htft.pick, p),
+      prob: Math.round(pr.htft.probability || 25), est: false,
+    });
+  }
+  const ou = pr.markets?.overUnder25;
+  if (ou && ou !== 'n/a') {
+    specs.push({
+      mk: 'ou25', label: 'O/U 2.5',
+      pick: ou, plabel: ou === 'over' ? 'Over 2.5 goals' : 'Under 2.5 goals',
+      prob: estProbOU(pr.predictedScore), est: true,
+    });
+  }
+  const bt = pr.markets?.btts;
+  if (bt && bt !== 'n/a') {
+    specs.push({
+      mk: 'btts', label: 'BTTS',
+      pick: bt, plabel: bt === 'yes' ? 'Both teams to score' : 'Not both to score',
+      prob: estProbBTTS(pr.predictedScore), est: true,
+    });
+  }
+
+  const buttons = specs
+    .map((s) => {
+      const odds = impliedOdds(s.prob).toFixed(2);
+      return `<button type="button" class="slip-add-btn"
+        data-mid="${escapeAttr(mid)}" data-home="${escapeAttr(home)}" data-away="${escapeAttr(away)}"
+        data-mk="${s.mk}" data-pick="${escapeAttr(s.pick)}" data-plabel="${escapeAttr(s.plabel)}"
+        data-mlabel="${escapeAttr(s.label)}" data-prob="${s.prob}" data-est="${s.est ? 1 : 0}">
+        <span class="sab-txt"><span class="sab-mk">${s.label}</span><span class="sab-pick">${s.plabel}${s.est ? '<i class="est">est</i>' : ''}</span></span>
+        <span class="sab-odds">${odds}<small>${s.prob}%</small></span>
+        <span class="sab-plus">+</span>
+      </button>`;
+    })
+    .join('');
+
+  return `
+    <div class="result-section slip-add-section">
+      <h3>Add to parlay slip</h3>
+      <div class="slip-add-row">${buttons}</div>
+      <p class="q-help">Cross-match parlay — one leg per match. Adding another pick from this match replaces its leg.</p>
+    </div>`;
+}
+
+/** Click handler (delegated on #resultBody) for the add-to-slip buttons. */
+function onResultBodyClick(e) {
+  const btn = e.target.closest('.slip-add-btn');
+  if (!btn) return;
+  const wasEmpty = state.slip.legs.length === 0;
+  const replaced = addLeg(btn.dataset);
+  btn.classList.add('added');
+  setTimeout(() => btn.classList.remove('added'), 900);
+  flashSlip(replaced ? 'Replaced this match’s leg' : 'Added to slip ✓');
+  if (wasEmpty) $('slipCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/** Add a leg from a button dataset. One leg per match (replaces existing). */
+function addLeg(d) {
+  const legs = state.slip.legs;
+  const existing = legs.findIndex((l) => l.matchId === d.mid);
+  const replaced = existing !== -1;
+  if (replaced) legs.splice(existing, 1);
+  legs.push({
+    legId: 'l' + Date.now() + Math.random().toString(36).slice(2, 6),
+    matchId: d.mid,
+    match: `${d.home} vs ${d.away}`,
+    homeTeam: d.home,
+    awayTeam: d.away,
+    kickoff: state.matches.find((m) => m.id === d.mid)?.kickoffUtc || state.selected?.kickoffUtc || null,
+    marketKey: d.mk,
+    marketLabel: d.mlabel,
+    pick: d.pick,
+    pickLabel: d.plabel,
+    prob: Number(d.prob) || 50,
+    estimated: d.est === '1' || d.est === 1 || d.est === true,
+    settled: false,
+    won: null,
+    actual: null,
+  });
+  saveSlip();
+  renderSlip();
+  return replaced;
+}
+
+function removeLeg(legId) {
+  state.slip.legs = state.slip.legs.filter((l) => l.legId !== legId);
+  saveSlip();
+  renderSlip();
+}
+
+function clearSlip() {
+  if (!state.slip.legs.length) return;
+  if (!confirm('Clear the whole parlay slip?')) return;
+  state.slip.legs = [];
+  saveSlip();
+  renderSlip();
+}
+
+function flashSlip(msg) {
+  const el = $('slipFlash');
+  if (!el) return;
+  el.textContent = msg;
+  clearTimeout(flashSlip._t);
+  flashSlip._t = setTimeout(() => (el.textContent = ''), 2000);
+}
+
+const combinedMultiplier = (legs) => legs.reduce((acc, l) => acc * impliedOdds(l.prob), 1);
+const combinedProbability = (legs) =>
+  legs.reduce((acc, l) => acc * (clampN(Number(l.prob) || 1, 1, 99) / 100), 1) * 100;
+
+/** A parlay is LOST the moment any leg loses; WON only when all legs have won. */
+function parlayVerdict(legs) {
+  if (legs.some((l) => l.settled && l.won === false)) return 'lost';
+  if (legs.length && legs.every((l) => l.settled && l.won === true)) return 'won';
+  return 'pending';
+}
+
+function renderLegRow(leg) {
+  const odds = impliedOdds(leg.prob).toFixed(2);
+  const cls = leg.settled ? (leg.won ? 'leg-won' : 'leg-lost') : '';
+  const status = leg.settled
+    ? leg.won
+      ? '<span class="mk mk-ok">✓ won</span>'
+      : '<span class="mk mk-no">✗ lost</span>'
+    : '';
+  const actual =
+    leg.settled && leg.actual
+      ? `<span class="slip-leg-actual">FT ${leg.actual.ft.home}-${leg.actual.ft.away}</span>`
+      : '';
+  return `<div class="slip-leg ${cls}">
+      <div class="slip-leg-main">
+        <div class="slip-leg-match">${leg.match}${leg.kickoff ? `<span class="slip-leg-kick">${kickoffShort(leg.kickoff)}</span>` : ''}</div>
+        <div class="slip-leg-pick"><span class="slip-mk-tag">${leg.marketLabel}</span><b>${leg.pickLabel}</b>${leg.estimated ? '<i class="est">est</i>' : ''}${actual}</div>
+      </div>
+      <div class="slip-leg-right">
+        <div class="slip-leg-odds">${odds}<small>${leg.prob}%</small></div>
+        ${status}
+        <button class="slip-leg-x" data-leg="${leg.legId}" type="button" title="Remove leg">✕</button>
+      </div>
+    </div>`;
+}
+
+function renderSlip() {
+  const legs = state.slip.legs;
+  $('slipCount').textContent = legs.length ? `${legs.length} leg${legs.length > 1 ? 's' : ''}` : 'empty';
+  const body = $('slipBody');
+  const footer = $('slipFooter');
+
+  if (!legs.length) {
+    body.innerHTML =
+      '<div class="empty">No legs yet. Generate a prediction above, then tap “Add to slip” on a market.</div>';
+    footer.classList.add('hidden');
+    return;
+  }
+
+  body.innerHTML = legs.map(renderLegRow).join('');
+  body.querySelectorAll('.slip-leg-x').forEach((b) =>
+    b.addEventListener('click', () => removeLeg(b.dataset.leg))
+  );
+
+  const mult = combinedMultiplier(legs);
+  const prob = combinedProbability(legs);
+  const stake = Number(state.slip.stake) || 0;
+  const verdict = parlayVerdict(legs);
+  const vBadge =
+    verdict === 'won'
+      ? '<span class="badge badge-correct">WON</span>'
+      : verdict === 'lost'
+      ? '<span class="badge badge-wrong">LOST</span>'
+      : '<span class="badge badge-pending">PENDING</span>';
+
+  $('slipCombProb').textContent = `${prob < 0.1 ? '<0.1' : prob.toFixed(1)}%`;
+  $('slipMult').textContent = `${mult.toFixed(2)}x`;
+  $('slipStake').value = stake;
+  $('slipReturns').textContent = (stake * mult).toFixed(2);
+  $('slipVerdict').innerHTML = vBadge;
+  footer.classList.remove('hidden');
+}
+
+/** Grade a single leg against an actual result. true / false / null (ungradeable). */
+function gradeLeg(leg, actual) {
+  const { ft, ht } = actual;
+  if (leg.marketKey === 'result') return outcomeOf(ft.home, ft.away) === leg.pick;
+  if (leg.marketKey === 'ou25') return (ft.home + ft.away > 2.5 ? 'over' : 'under') === leg.pick;
+  if (leg.marketKey === 'btts') return (ft.home > 0 && ft.away > 0 ? 'yes' : 'no') === leg.pick;
+  if (leg.marketKey === 'htft') {
+    if (!ht) return null; // need half-time score to grade HT/FT
+    const aOutcome = outcomeOf(ft.home, ft.away);
+    const aHt = ht.home > ht.away ? 'home_lead' : ht.home < ht.away ? 'away_lead' : 'draw';
+    return `${sideCode(aHt)}/${sideCode(aOutcome)}` === leg.pick;
+  }
+  return null;
+}
+
+/** Fetch results and settle every unsettled leg (all legs must win). */
+async function settleParlay() {
+  const btn = $('checkParlayBtn');
+  const pending = state.slip.legs.filter((l) => !l.settled && l.matchId);
+  if (!pending.length) {
+    flash(btn, 'Nothing to settle');
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Checking…';
+
+  // Refresh fixtures for latest scores (don't clobber real data with mock).
+  try {
+    const fresh = await api('/api/matches/upcoming');
+    if (fresh.matches && fresh.matches.length && !fresh.isMock) state.matches = fresh.matches;
+  } catch {}
+
+  let settled = 0;
+  let notFinished = 0;
+  let notFound = 0;
+  let cantGrade = 0;
+
+  for (const leg of pending) {
+    let actual = actualFromMatch(state.matches.find((x) => x.id === leg.matchId));
+    if (!actual) {
+      try {
+        const r = await api(`/api/matches/${leg.matchId}/result`);
+        if (r.found && r.finished && r.ft) actual = { ft: r.ft, ht: r.ht || null };
+        else if (r.found) notFinished++;
+        else notFound++;
+      } catch {
+        notFound++;
+      }
+    }
+    if (actual) {
+      const won = gradeLeg(leg, actual);
+      if (won === null) {
+        cantGrade++;
+        continue; // e.g. HT/FT with no half-time data yet
+      }
+      leg.actual = actual;
+      leg.won = won;
+      leg.settled = true;
+      settled++;
+    }
+  }
+
+  saveSlip();
+  renderSlip();
+  btn.disabled = false;
+  btn.textContent = '✓ Check parlay result';
+  const parts = [`Settled ${settled}`];
+  if (notFinished) parts.push(`${notFinished} not finished`);
+  if (cantGrade) parts.push(`${cantGrade} missing HT data`);
+  if (notFound) parts.push(`${notFound} unavailable`);
+  flash(btn, parts.join(' · '));
 }
 
 /* ------------------------------------------------------------------ */
@@ -854,6 +1166,17 @@ function init() {
   });
   $('checkResultsBtn').addEventListener('click', settleAll);
 
+  // Parlay / bet slip.
+  $('resultBody').addEventListener('click', onResultBodyClick);
+  $('clearSlipBtn').addEventListener('click', clearSlip);
+  $('checkParlayBtn').addEventListener('click', settleParlay);
+  $('slipStake').addEventListener('input', (e) => {
+    state.slip.stake = Math.max(0, Number(e.target.value) || 0);
+    saveSlip();
+    const mult = combinedMultiplier(state.slip.legs);
+    $('slipReturns').textContent = (state.slip.stake * mult).toFixed(2);
+  });
+
   // Sort controls (persisted across sessions).
   loadSortPref();
   $('sortBy').addEventListener('change', (e) => {
@@ -871,6 +1194,8 @@ function init() {
   loadStatus();
   loadMatches();
   renderHistory();
+  loadSlip();
+  renderSlip();
   restoreLastResult();
 }
 

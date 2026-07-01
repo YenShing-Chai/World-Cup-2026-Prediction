@@ -111,6 +111,29 @@
       </div>
     </div>
 
+    <!-- 6.5 PARLAY / BET SLIP -->
+    <section class="card" id="slipCard">
+      <div class="card-head">
+        <h2>🎟️ Parlay slip <span class="slip-count-badge" id="slipCount">empty</span></h2>
+        <div class="head-actions">
+          <span class="slip-flash" id="slipFlash"></span>
+          <button class="btn btn-primary" id="checkParlayBtn" type="button" title="Fetch results and settle the parlay">✓ Check parlay result</button>
+          <button class="btn btn-ghost" id="clearSlipBtn" type="button">Clear slip</button>
+        </div>
+      </div>
+      <p class="hint">Combine one pick per match into an accumulator — every leg must win. Odds are implied from each pick’s confidence: illustrative only, not betting advice.</p>
+      <div id="slipBody" class="slip-body">
+        <div class="empty">No legs yet. Generate a prediction above, then tap “Add to slip” on a market.</div>
+      </div>
+      <div id="slipFooter" class="slip-footer hidden">
+        <div class="slip-stat"><span class="slip-stat-label">Combined chance</span><span class="slip-stat-val" id="slipCombProb">—</span></div>
+        <div class="slip-stat"><span class="slip-stat-label">Payout multiplier</span><span class="slip-stat-val accent" id="slipMult">—</span></div>
+        <div class="slip-stat slip-stake-wrap"><span class="slip-stat-label">Stake</span><input type="number" id="slipStake" min="0" step="1" value="10" /></div>
+        <div class="slip-stat"><span class="slip-stat-label">Potential returns</span><span class="slip-stat-val accent" id="slipReturns">—</span></div>
+        <div class="slip-stat"><span class="slip-stat-label">Parlay</span><span class="slip-stat-val" id="slipVerdict"></span></div>
+      </div>
+    </section>
+
     <!-- 7. PREDICTION HISTORY -->
     <section class="card" id="historyCard">
       <div class="card-head">

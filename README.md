@@ -31,9 +31,22 @@ alternative scenario, data sources, missing data, disclaimer) · betting-style
 markets incl. Over/Under 2.5, BTTS, Handicap and a dedicated **HT/FT double
 result** · localStorage history · **re-run** button · **compare two styles**
 (Safe vs Upset) · **100-run Monte Carlo simulation** (AI-estimated expected goals
-→ Poisson sims → Win/Draw/Loss % with a bar chart) · **auto-grading** of saved
-predictions (Correct/Wrong per market + accuracy scoreboard) once the real result
-is in · sortable history · all times shown in **Malaysia time (GMT+8)**.
+→ Poisson sims → Win/Draw/Loss % with a bar chart) · **parlay / bet slip**
+(add one pick per match from any prediction → combined win-chance, implied payout
+multiplier, stake → potential returns, auto-graded WON/LOST with per-leg ✓/✗) ·
+**auto-grading** of saved predictions (Correct/Wrong per market + accuracy
+scoreboard) once the real result is in · sortable history · all times shown in
+**Malaysia time (GMT+8)**.
+
+### Parlay / bet slip
+Every prediction card has **Add to slip** buttons for its markets (match result,
+HT/FT, Over/Under 2.5, BTTS). The slip is a **cross-match accumulator** — one leg
+per match (adding another pick from the same match replaces its leg). It shows the
+**combined chance** (product of each leg's probability), an **implied payout
+multiplier** (from each pick's confidence), and an optional **stake → potential
+returns**. Tap **Check parlay result** to settle it: all legs must win for the
+parlay to win. Everything persists in `localStorage`. Odds are illustrative only —
+**not betting advice**.
 
 ---
 
